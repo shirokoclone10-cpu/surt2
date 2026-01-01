@@ -46,11 +46,6 @@ const Main = ({ settings, onSettingChange }) => {
             onChange={(v) => onSettingChange((s) => (s.aimbot_.aimAllies_ = v))}
             shouldWarning={(v) => v}
           />
-          <div style={{ marginTop: '0.25rem' }}>
-            <p className="keybind-help-text" style={{ margin: 0 }}>
-              Enabling will allow the aimbot to target teammates and affects automatic/blatant behavior.
-            </p>
-          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
           <Checkbox
@@ -83,6 +78,12 @@ const Main = ({ settings, onSettingChange }) => {
           onChange={(v) => onSettingChange((s) => (s.meleeLock_.autoMelee_ = v))}
         />
         <Checkbox
+          id="auto-attack"
+          label="Auto Attack"
+          checked={settings.meleeLock_.autoAttack_}
+          onChange={(v) => onSettingChange((s) => (s.meleeLock_.autoAttack_ = v))}
+        />
+        <Checkbox
           id="attack-allies"
           label="Attack Allies"
           checked={settings.meleeLock_.attackAllies_}
@@ -111,6 +112,13 @@ const Main = ({ settings, onSettingChange }) => {
         label="Semi Auto"
         enabled={settings.autoFire_.enabled_}
         onEnabledChange={(v) => onSettingChange((s) => (s.autoFire_.enabled_ = v))}
+      />
+
+      <SectionTitle
+        icon={Icons.Heal_}
+        label="Auto Heal"
+        enabled={settings.autoHeal_.enabled_}
+        onEnabledChange={(v) => onSettingChange((s) => (s.autoHeal_.enabled_ = v))}
       />
     </div>
   );

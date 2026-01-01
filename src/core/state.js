@@ -41,10 +41,14 @@ export const defaultSettings = {
   meleeLock_: {
     enabled_: true,
     autoMelee_: false,
+    autoAttack_: true,
     attackAllies_: false,
   },
   autoFire_: {
     enabled_: true,
+  },
+  autoHeal_: {
+    enabled_: false,
   },
   xray_: {
     enabled_: true,
@@ -116,11 +120,16 @@ const settingsKeys = {
     _k: '󠁑',
     enabled_: '󠁧',
     autoMelee_: '󠁢',
+    autoAttack_: '󠁤',
     attackAllies_: '󠁣',
   },
   autoFire_: {
     _k: '󠄸',
     enabled_: '󠄴',
+  },
+  autoHeal_: {
+    _k: '󠅫',
+    enabled_: '󠅬',
   },
   xray_: {
     _k: '󠅔',

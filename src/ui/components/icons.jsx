@@ -18,6 +18,7 @@ import {
   Settings,
   Layers,
   RotateCw,
+  Heart,
   BadgePlus,
 } from 'lucide-preact';
 
@@ -32,6 +33,7 @@ const PenLineFilled = (props) => <PenLine {...props} strokeWidth="2.5" />;
 export const Icons = {
   Aimbot_: Target,
   MeleeLock_: Sword,
+  Heal_: Heart,
   AutoSwitch_: ArrowLeftRight,
   SemiAuto_: Rocket,
   XRay_: Eye,

@@ -3,6 +3,7 @@ import { ref_addEventListener } from '@/core/hook.js';
 import { outer } from '@/core/outer';
 import { translations } from '@/core/obfuscatedNameTranslator.js';
 import { hasValidTarget, getAimbotShootableState } from '@/features/Aimbot.js';
+import { inputCommands } from '@/utils/constants.js';
 
 export let autoFireEnabled;
 

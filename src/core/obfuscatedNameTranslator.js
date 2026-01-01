@@ -61,6 +61,9 @@ export function translate(gameManager) {
       dead_: '',
       particles_: '',
       idToObj_: '',
+      inventory_: '',
+      health_: '',
+      boost_: '',
     };
 
     const convertedSignatureMap = {};
@@ -192,8 +195,31 @@ export function translate(gameManager) {
                       }
                     ),
                   });
-                } catch { }
-              }
+                } catch { }                // Find health and boost properties in netData
+                try {
+                  if (translated.netData_ != null) {
+                    const netDataObj = game[translated.activePlayer_][translated.netData_];
+                    if (netDataObj) {
+                      const netDataKeys = Object.getOwnPropertyNames(netDataObj);
+                      // Find numeric properties that could be health and boost
+                      // Health is typically around 0-100, boost is 0-100
+                      const numericProps = netDataKeys.filter(
+                        (k) => typeof netDataObj[k] === 'number' && netDataObj[k] >= 0 && netDataObj[k] <= 100
+                      );
+                      
+                      // Try to find health - usually named something with 'health' or is a large value property
+                      if (translated.health_ == null && numericProps.length > 0) {
+                        // First numeric property is likely health
+                        translated.health_ = numericProps[0];
+                      }
+                      
+                      // Try to find boost - usually second numeric property after health
+                      if (translated.boost_ == null && numericProps.length > 1) {
+                        translated.boost_ = numericProps[1];
+                      }
+                    }
+                  }
+                } catch { }              }
               (() => {
                 let nextIsVisual = false;
                 let cameraInteracted = false;

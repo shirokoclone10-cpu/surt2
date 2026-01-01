@@ -2,6 +2,7 @@ import xray from '@/features/X-Ray.js';
 import esp from '@/features/ESP.js';
 import grenadeTimer from '@/features/GrenadeTimer.js';
 import autoFire, { autoFireEnabled } from '@/features/AutoFire.js';
+import autoHeal from '@/features/AutoHeal.js';
 import aimbot, { hasValidTarget } from '@/features/Aimbot.js';
 import mapHighlights from '@/features/MapHighlights.js';
 import autoSwitch from '@/features/AutoSwitch.js';
@@ -32,6 +33,7 @@ function injectGame(oninject) {
 
 const loadStaticPlugins = () => {
   autoFire();
+  autoHeal();
   mapHighlights();
   blurBackground();
 };

@@ -20,7 +20,7 @@ const CSS_CONTENT = `
 #news-block:hover {
   opacity: 1 !important;
 }
-#ad-block-left, #social-share-block, #start-bottom-middle .footer-after {
+#ad-block-left, #social-share-block, #start-bottom-middle .footer-after, #start-bottom-middle {
   pointer-events: none !important;
   opacity: 0 !important;
 }

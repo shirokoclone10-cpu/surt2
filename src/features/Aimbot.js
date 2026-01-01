@@ -257,128 +257,92 @@ function predictPosition(enemy, currentPlayer) {
 
   const enemyPos = enemy[translations.visualPos_];
   const currentPlayerPos = currentPlayer[translations.visualPos_];
-  const now = performance.now();
+  
+  // Store position history for velocity calculation
   const enemyId = enemy.__id;
-
   const history = state.previousEnemies_[enemyId] ?? (state.previousEnemies_[enemyId] = []);
+  const now = performance.now();
+  
   history.push([now, { ...enemyPos }]);
-  if (history.length > 15) history.shift();
+  if (history.length > 20) history.shift();
 
-  // Simple velocity calculation: just use last few samples
-  const minHistorySamples = 3;
-  if (history.length < minHistorySamples) {
+  // Need at least 3 samples for proper velocity calculation
+  if (history.length < 3) {
     return gameManager.game[translations.camera_][translations.pointToScreen_]({
       x: enemyPos.x,
       y: enemyPos.y,
     });
   }
 
-  // Simple velocity: average of last 5 samples with spike detection
+  // Calculate velocity using older position samples (surviv-cheat posOldOld method)
   let velocityX = 0;
   let velocityY = 0;
-  let sampleCount = 0;
-  const velocitySamples = [];
   
-  const sampleWindow = Math.min(history.length - 1, 5); // Use last 5 samples
-  for (let i = 1; i <= sampleWindow; i++) {
-    const curr = history[history.length - i];
-    const prev = history[history.length - i - 1];
-    const dt = (curr[0] - prev[0]) / 1000;
-    
-    if (dt > 0.0005 && dt < 0.1) { // Ignore timing spikes
-      const vx = (curr[1].x - prev[1].x) / dt;
-      const vy = (curr[1].y - prev[1].y) / dt;
-      
-      // Clamp velocity to reasonable range (max 2000 units/sec)
-      const vMag = Math.hypot(vx, vy);
-      if (vMag <= 2000) {
-        velocitySamples.push({ x: vx, y: vy, mag: vMag });
-        velocityX += vx;
-        velocityY += vy;
-        sampleCount++;
-      }
-    }
+  // Use position from 2-3 frames ago for stability
+  const oldestIdx = Math.max(0, history.length - 3);
+  const newestIdx = history.length - 1;
+  const oldPos = history[oldestIdx][1];
+  const newPos = history[newestIdx][1];
+  const timeDiff = (history[newestIdx][0] - history[oldestIdx][0]) / 1000; // Convert to seconds
+  
+  if (timeDiff > 0.001) { // Avoid division by very small numbers
+    velocityX = (newPos.x - oldPos.x) / timeDiff;
+    velocityY = (newPos.y - oldPos.y) / timeDiff;
   }
 
-  if (sampleCount > 0) {
-    velocityX /= sampleCount;
-    velocityY /= sampleCount;
-    
-    // Spike detection: if latest sample differs too much, down-weight it
-    if (velocitySamples.length > 0) {
-      const latestVel = velocitySamples[0];
-      const avgMag = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
-      
-      // If latest velocity is >2x average magnitude, it's likely a spike
-      if (latestVel.mag > avgMag * 2 && avgMag > 10) {
-        // Re-calculate without the latest sample
-        velocityX = 0;
-        velocityY = 0;
-        for (let i = 1; i < velocitySamples.length; i++) {
-          velocityX += velocitySamples[i].x;
-          velocityY += velocitySamples[i].y;
-        }
-        if (velocitySamples.length > 1) {
-          velocityX /= (velocitySamples.length - 1);
-          velocityY /= (velocitySamples.length - 1);
-        }
-      }
-    }
+  // Clamp velocity to reasonable range
+  const velMag = Math.hypot(velocityX, velocityY);
+  if (velMag > 2000) {
+    const scale = 2000 / velMag;
+    velocityX *= scale;
+    velocityY *= scale;
   }
 
-  // Adaptive smoothing: closer enemies = less smoothing (more responsive)
-  let alpha = 0.6; // Default
-  const screenDistance = Math.sqrt(
-    (currentPlayerPos.x - enemyPos.x) ** 2 + 
-    (currentPlayerPos.y - enemyPos.y) ** 2
-  );
-  
-  if (screenDistance < 100) {
-    alpha = 0.75; // Very close: very responsive
-  } else if (screenDistance < 300) {
-    alpha = 0.65; // Medium: balanced
-  } else {
-    alpha = 0.55; // Far: smoother
-  }
-
-  // Smooth with previous velocity + damping for direction changes
-  if (state.previousEnemies_[enemyId]?.lastVelocity_) {
-    const lastVel = state.previousEnemies_[enemyId].lastVelocity_;
-    const newMag = Math.hypot(velocityX, velocityY);
-    const oldMag = Math.hypot(lastVel.x, lastVel.y);
-    
-    // Damping: if direction changed significantly, smooth more
-    if (oldMag > 10) {
-      const dot = (velocityX * lastVel.x + velocityY * lastVel.y) / (newMag * oldMag + 0.1);
-      const angleDiff = Math.acos(Math.max(-1, Math.min(1, dot)));
-      
-      // If direction changed >45°, increase smoothing
-      if (angleDiff > Math.PI / 4) {
-        alpha *= 0.7; // Reduce responsiveness
-      }
-    }
-    
-    velocityX = velocityX * alpha + lastVel.x * (1 - alpha);
-    velocityY = velocityY * alpha + lastVel.y * (1 - alpha);
-  }
-  
-  if (!state.previousEnemies_[enemyId].lastVelocity_) {
-    state.previousEnemies_[enemyId].lastVelocity_ = {};
-  }
-  
-  state.previousEnemies_[enemyId].lastVelocity_ = { x: velocityX, y: velocityY };
-
+  // Get weapon and bullet information
   const weapon = findWeapon(currentPlayer);
   const bullet = findBullet(weapon);
   const bulletSpeed = bullet?.speed || 1000;
-  
-  // Simple linear prediction: where will enemy be when bullet arrives
-  const distToEnemy = Math.hypot(enemyPos.x - currentPlayerPos.x, enemyPos.y - currentPlayerPos.y);
-  const bulletTravelTime = distToEnemy / bulletSpeed;
 
+  // Use quadratic formula approach from surviv-cheat for more accurate prediction
+  // This solves: when will the bullet collide with the moving enemy?
+  const userX = currentPlayerPos.x;
+  const userY = currentPlayerPos.y;
+  const enemyDirX = velocityX;
+  const enemyDirY = velocityY;
+  const diffX = enemyPos.x - userX;
+  const diffY = enemyPos.y - userY;
+
+  // Quadratic equation coefficients: at² + bt + c = 0
+  // Where t is the time when bullet and enemy collide
+  const a = enemyDirX * enemyDirX + enemyDirY * enemyDirY - bulletSpeed * bulletSpeed;
+  const b = diffX * enemyDirX + diffY * enemyDirY;
+  const c = diffX * diffX + diffY * diffY;
+  
+  // Discriminant check
+  let t = 0;
+  const discriminant = b * b - a * c;
+  
+  if (a !== 0 && discriminant >= 0) {
+    // Solve quadratic formula: take the positive root
+    const sqrtDiscriminant = Math.sqrt(discriminant);
+    const t1 = (-b - sqrtDiscriminant) / a;
+    const t2 = (-b + sqrtDiscriminant) / a;
+    
+    // Use the smallest positive time value
+    t = t1 > 0 ? (t2 > 0 ? Math.min(t1, t2) : t1) : (t2 > 0 ? t2 : 0);
+  } else if (a === 0 && b !== 0) {
+    // Linear case (enemy velocity == bullet speed)
+    t = -c / (2 * b);
+  }
+
+  // Clamp to reasonable prediction time
+  t = Math.max(0, Math.min(t, 2.0));
+
+  // Calculate predicted position with optional prediction level smoothing
+  const predictionLevel = settings.aimbot_.predictionLevel_ ?? 1.0;
   const predictedPos = {
-    x: enemyPos.x + velocityX * bulletTravelTime,
-    y: enemyPos.y + velocityY * bulletTravelTime,
+    x: enemyPos.x + velocityX * t * predictionLevel,
+    y: enemyPos.y + velocityY * t * predictionLevel,
   };
 
   return gameManager.game[translations.camera_][translations.pointToScreen_](predictedPos);
@@ -725,13 +689,20 @@ function aimbotTicker() {
       // Improved: Extended detection range + hysteresis for smoother engagement
       const meleeTargetInRange = distanceToMeleeEnemy <= MELEE_ENGAGE_DISTANCE + MELEE_LOCK_HYSTERESIS;
       const meleeTargetDetected = distanceToMeleeEnemy <= MELEE_DETECTION_DISTANCE;
+      
+      // In blatant mode with auto melee, extend detection range significantly
+      // This allows auto-switch to happen from further away
+      const blatantMeleeDistance = MELEE_DETECTION_DISTANCE * 1.5; // ~11 units instead of 7.5
+      const isBlatantMeleeRange = settings.aimbot_.blatant_ && 
+        settings.meleeLock_.autoMelee_ && 
+        distanceToMeleeEnemy <= blatantMeleeDistance;
 
       // Auto-switch to melee if enabled and target in range
       if (
         wantsMeleeLock &&
         settings.meleeLock_.autoMelee_ &&
         !isMeleeEquipped &&
-        meleeTargetInRange &&
+        (meleeTargetInRange || isBlatantMeleeRange) &&
         meleeEnemy
       ) {
         queueInput(inputCommands.EquipMelee_);
@@ -739,13 +710,13 @@ function aimbotTicker() {
       }
 
       // Reset flag if we already have melee equipped or target is out of range
-      if (isMeleeEquipped || !meleeTargetInRange) {
+      if (isMeleeEquipped || (!meleeTargetInRange && !isBlatantMeleeRange)) {
         state.isSwitchingToMelee_ = false;
       }
 
       // Melee lock is active if: wants melee, has enemy/loot in range, target is valid
       // Also allow engagement if we just queued melee switch and are waiting for it to complete
-      const meleeLockActive = wantsMeleeLock && meleeTargetInRange && meleeEnemy && 
+      const meleeLockActive = wantsMeleeLock && (meleeTargetInRange || isBlatantMeleeRange) && meleeEnemy && 
         (isMeleeEquipped || state.isSwitchingToMelee_);
 
       if (meleeLockActive) {
@@ -779,6 +750,14 @@ function aimbotTicker() {
             x: targetPos.x,
             y: targetPos.y,
           });
+          
+          // AutoAttack (surviv-cheat style): Auto-fire melee when in range
+          // Fire continuously when melee equipped and in engage distance
+          if (settings.meleeLock_.autoAttack_ && isMeleeEquipped && distanceToMeleeEnemy < MELEE_ENGAGE_DISTANCE) {
+            // Simulate continuous fire for melee
+            inputState.queuedInputs_.push(inputCommands.Fire_);
+          }
+          
           setAimState(new AimState('meleeLock', { x: screenPos.x, y: screenPos.y }, moveDir, true));
           aimUpdated = true;
           aimOverlays.hideAll();
